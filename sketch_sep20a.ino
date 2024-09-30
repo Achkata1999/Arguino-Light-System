@@ -1,161 +1,157 @@
 #include <IRremote.h>
 
-// Define pins for RGB LED
-const int redPin = 5;
-const int greenPin = 6;
-const int bluePin = 9;
+const int RED_PIN = 5;
+const int GREEN_PIN = 6;
+const int BLUE_PIN = 9;
 
-// Define pins for sensors
-const int ldrPin = A0;
-const int switchPin = 2; 
+const int LDR_PIN = A0;
+const int SWITCH_PIN = 2;
 
-// IR remote codes
 #define IR_RECEIVE_PIN 8
-const unsigned long redIRCode = 4211404544;
-const unsigned long greenIRCode = 4194692864;
-const unsigned long blueIRCode = 4177981184;
-const unsigned long yellowIRCode = 3944017664;
-const unsigned long purpleIRCode = 4044287744;
-const unsigned long whiteIRCode = 4161269504;  
-const unsigned long pinkIRCode = 3910594304;  
-const unsigned long orangeIRCode = 4010864384; 
-const unsigned long lowBrightnessIRCode = 4261539584;
-const unsigned long upBrightnessIRCode = 4278251264;
-const unsigned long powerToggleIRCode = 4228116224;
-const unsigned long autoBrightnessToggleIRCode = 3893882624; 
-const unsigned long rainbowStartIRCode = 4094422784;
 
-int currentColor = 3; 
-bool rainbowMode = false; 
-bool deviceOn = true; 
-bool autoBrightness = false; 
-int brightness = 255; 
+const int MAX_BRIGHTNESS = 255;
+const int BRIGHTNESS_STEP = 25;
+
+enum Colors {
+  RED, GREEN, BLUE, YELLOW, PURPLE, WHITE, PINK, ORANGE
+};
+
+enum IRCode {
+  RED_CODE = 4211404544,
+  GREEN_CODE = 4194692864,
+  BLUE_CODE = 4177981184,
+  YELLOW_CODE = 3944017664,
+  PURPLE_CODE = 4044287744,
+  WHITE_CODE = 4161269504,
+  PINK_CODE = 3910594304,
+  ORANGE_CODE = 4010864384,
+  LOW_BRIGHTNESS_CODE = 4261539584,
+  UP_BRIGHTNESS_CODE = 4278251264,
+  POWER_TOGGLE_CODE = 4228116224,
+  AUTO_BRIGHTNESS_TOGGLE_CODE = 3893882624,
+  RAINBOW_START_CODE = 4094422784
+};
+
+bool deviceOn = true;
+bool rainbowMode = false;
+bool autoBrightness = false;
+int currentColor = YELLOW; 
+int brightness = MAX_BRIGHTNESS;
 
 void setup() {
   Serial.begin(9600);
   IrReceiver.begin(IR_RECEIVE_PIN);
 
-  pinMode(redPin, OUTPUT);
-  pinMode(greenPin, OUTPUT);
-  pinMode(bluePin, OUTPUT);
+  pinMode(RED_PIN, OUTPUT);
+  pinMode(GREEN_PIN, OUTPUT);
+  pinMode(BLUE_PIN, OUTPUT);
 
-  pinMode(switchPin, INPUT_PULLUP);
+  pinMode(SWITCH_PIN, INPUT_PULLUP);
 
-  setColor(255, 255, 0);
+  setColor(YELLOW);
 }
 
 void loop() {
-  if (IrReceiver.decode()) {
-    unsigned long irCode = IrReceiver.decodedIRData.decodedRawData;
-    IrReceiver.resume(); 
+  handleIRInput();
 
-    if (irCode == redIRCode) {
-      currentColor = 0; // Red
-      rainbowMode = false; // Turn off rainbow mode
-    } else if (irCode == greenIRCode) {
-      currentColor = 1; // Green
-      rainbowMode = false;
-    } else if (irCode == blueIRCode) {
-      currentColor = 2; // Blue
-      rainbowMode = false;
-    } else if (irCode == yellowIRCode) {
-      currentColor = 3; // Yellow
-      rainbowMode = false;
-    } else if (irCode == purpleIRCode) {
-      currentColor = 4; // Purple
-      rainbowMode = false;
-    } else if (irCode == whiteIRCode) {
-      currentColor = 5; // White
-      rainbowMode = false;
-    } else if (irCode == pinkIRCode) {
-      currentColor = 6; // Pink
-      rainbowMode = false;
-    } else if (irCode == orangeIRCode) {
-      currentColor = 7; // Orange
-      rainbowMode = false;
-    } else if (irCode == rainbowStartIRCode) {
-      rainbowMode = true; // Start rainbow mode
-    } else if (irCode == lowBrightnessIRCode) {
-      decreaseBrightness();
-    } else if (irCode == upBrightnessIRCode) {
-      increaseBrightness();
-    } else if (irCode == powerToggleIRCode) {
-      togglePower();
-    } else if (irCode == autoBrightnessToggleIRCode) {
-      toggleAutoBrightness(); // Manual toggle for auto brightness
-    }
-  }
-
-  // Check if the device is turned off
   if (!deviceOn) {
-    setColor(0, 0, 0); 
+    setColor(0, 0, 0);  
     delay(100);
-    return; 
+    return;
   }
 
-  // Check switch state for automatic brightness mode
-  bool isAutomatic = (digitalRead(switchPin) == LOW);
-
+  handleAutoBrightness();
+  
   if (rainbowMode) {
     runRainbowEffect();
   } else {
-    if (autoBrightness) {
-      int ldrValue = analogRead(ldrPin);
-      
-      brightness = map(ldrValue, 1023, 0, 0, 255);
-      Serial.print("LDR Value: ");
-      Serial.print(ldrValue);
-      Serial.print(" - Adjusted Brightness: ");
-      Serial.println(brightness);
-    }
-
-    int redValue = 0;
-    int greenValue = 0;
-    int blueValue = 0;
-
-    switch (currentColor) {
-      case 0: // Red
-        redValue = brightness;
-        break;
-      case 1: // Green
-        greenValue = brightness;
-        break;
-      case 2: // Blue
-        blueValue = brightness;
-        break;
-      case 3: // Yellow
-        redValue = brightness;
-        greenValue = brightness;
-        break;
-      case 4: // Purple
-        redValue = brightness;
-        blueValue = brightness;
-        break;
-      case 5: // White
-        redValue = brightness;
-        greenValue = brightness;
-        blueValue = brightness;
-        break;
-      case 6: // Pink
-        redValue = brightness;
-        blueValue = brightness / 2;
-        break;
-      case 7: // Orange
-        redValue = brightness;
-        greenValue = brightness / 2;
-        break;
-    }
-
-    setColor(redValue, greenValue, blueValue);
+    applyColor(currentColor);
   }
 
   delay(100);
 }
 
+void handleIRInput() {
+  if (IrReceiver.decode()) {
+    unsigned long irCode = IrReceiver.decodedIRData.decodedRawData;
+    IrReceiver.resume();
+
+    switch (irCode) {
+      case RED_CODE: setColorMode(RED); break;
+      case GREEN_CODE: setColorMode(GREEN); break;
+      case BLUE_CODE: setColorMode(BLUE); break;
+      case YELLOW_CODE: setColorMode(YELLOW); break;
+      case PURPLE_CODE: setColorMode(PURPLE); break;
+      case WHITE_CODE: setColorMode(WHITE); break;
+      case PINK_CODE: setColorMode(PINK); break;
+      case ORANGE_CODE: setColorMode(ORANGE); break;
+      case RAINBOW_START_CODE: toggleRainbowMode(); break;
+      case LOW_BRIGHTNESS_CODE: decreaseBrightness(); break;
+      case UP_BRIGHTNESS_CODE: increaseBrightness(); break;
+      case POWER_TOGGLE_CODE: togglePower(); break;
+      case AUTO_BRIGHTNESS_TOGGLE_CODE: toggleAutoBrightness(); break;
+    }
+  }
+}
+
+void setColorMode(int color) {
+  currentColor = color;
+  rainbowMode = false;
+}
+
+void toggleRainbowMode() {
+  rainbowMode = !rainbowMode;
+  Serial.println(rainbowMode ? "Rainbow mode ON" : "Rainbow mode OFF");
+}
+
+void togglePower() {
+  deviceOn = !deviceOn;
+  Serial.println(deviceOn ? "Device turned ON" : "Device turned OFF");
+}
+
+void toggleAutoBrightness() {
+  autoBrightness = !autoBrightness;
+  Serial.println(autoBrightness ? "Auto brightness ON" : "Auto brightness OFF");
+}
+
+void handleAutoBrightness() {
+  if (autoBrightness) {
+    int ldrValue = analogRead(LDR_PIN);
+    brightness = map(ldrValue, 1023, 0, 0, MAX_BRIGHTNESS);
+    Serial.print("LDR Value: ");
+    Serial.print(ldrValue);
+    Serial.print(" - Adjusted Brightness: ");
+    Serial.println(brightness);
+  }
+}
+
+void decreaseBrightness() {
+  brightness = max(0, brightness - BRIGHTNESS_STEP);
+  Serial.println("Brightness decreased");
+}
+
+void increaseBrightness() {
+  brightness = min(MAX_BRIGHTNESS, brightness + BRIGHTNESS_STEP);
+  Serial.println("Brightness increased");
+}
+
 void setColor(int red, int green, int blue) {
-  analogWrite(redPin, red);
-  analogWrite(greenPin, green);
-  analogWrite(bluePin, blue);
+  analogWrite(RED_PIN, red);
+  analogWrite(GREEN_PIN, green);
+  analogWrite(BLUE_PIN, blue);
+}
+
+void applyColor(int color) {
+  switch (color) {
+    case RED: setColor(brightness, 0, 0); break;
+    case GREEN: setColor(0, brightness, 0); break;
+    case BLUE: setColor(0, 0, brightness); break;
+    case YELLOW: setColor(brightness, brightness, 0); break;
+    case PURPLE: setColor(brightness, 0, brightness); break;
+    case WHITE: setColor(brightness, brightness, brightness); break;
+    case PINK: setColor(brightness, 0, brightness / 2); break;
+    case ORANGE: setColor(brightness, brightness / 2, 0); break;
+  }
 }
 
 void runRainbowEffect() {
@@ -167,24 +163,4 @@ void runRainbowEffect() {
     setColor(red, green, blue);
     delay(15);
   }
-}
-
-void decreaseBrightness() {
-  brightness = max(0, brightness - 25);
-  Serial.println("Brightness decreased");
-}
-
-void increaseBrightness() {
-  brightness = min(255, brightness + 25);
-  Serial.println("Brightness increased");
-}
-
-void togglePower() {
-  deviceOn = !deviceOn; 
-  Serial.println(deviceOn ? "Device turned ON" : "Device turned OFF");
-}
-
-void toggleAutoBrightness() {
-  autoBrightness = !autoBrightness;
-  Serial.println(autoBrightness ? "Automatic brightness ON" : "Automatic brightness OFF");
 }
